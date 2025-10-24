@@ -1,0 +1,18 @@
+simulation:
+  time_steps: 100
+  time_step_duration_ms: 100
+
+topology:
+  type: sample
+  nodes: 5
+  edges: 6
+
+routing:
+  algorithm: dijkstra
+  weights: {}
+
+traffic:
+  - class: test
+    src: 1
+    dst: 4
+    rate_kbps: 64
