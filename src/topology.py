@@ -22,16 +22,19 @@ import yaml
 import networkx as nx
 
 # --- Default constants (tweakable) ---
-DEFAULT_CORE_ENERGY_J = 1e6      # Joules for "core" nodes (very large)
-DEFAULT_EDGE_ENERGY_J = 1e4      # Joules for "edge" nodes (smaller battery)
+# NOTE: Energy values scaled for visibility in short simulations
+# Real-world values would be much smaller, but we increase by 1000x for demo purposes
+DEFAULT_CORE_ENERGY_J = 1000.0   # Joules for "core" nodes (scaled for visibility)
+DEFAULT_EDGE_ENERGY_J = 500.0    # Joules for "edge" nodes (scaled for visibility)
 DEFAULT_BW_CHOICES_MBPS = [1, 10, 50, 100]  # choose from these Mbps
 DEFAULT_PROP_DELAY_MS_RANGE = (1.0, 30.0)   # ms
 DEFAULT_LOSS_CHOICES = [0.0, 0.0, 0.001, 0.01]   # baseline loss distribution
 DEFAULT_QUEUE_BYTES = 20_000     # 20 KB default queue
 
-# Energy consumption constants (useful later)
-TX_ENERGY_PER_BIT = 50e-9   # 50 nJ per bit (example)
-RX_ENERGY_PER_BIT = 30e-9   # 30 nJ per bit (example)
+# Energy consumption constants (scaled up 1000x for visibility)
+# Real-world: 50 nJ/bit, but we use 50 μJ/bit to see energy drain in simulation
+TX_ENERGY_PER_BIT = 50e-6   # 50 μJ per bit (scaled for demo)
+RX_ENERGY_PER_BIT = 30e-6   # 30 μJ per bit (scaled for demo)
 
 def create_scale_free_topology(
     n=25,
@@ -166,29 +169,40 @@ def simple_dynamic_update(G, t, params=None):
         new_delay = max(0.1, base_delay + jitter + spike)
         d['prop_delay_ms'] = new_delay
 
-        # LOSS: occasional burst events
+        # LOSS: occasional burst events + congestion correlation
         base_loss = ds.get('loss_prob_base', d['loss_prob'])
+        
+        # Add congestion-induced loss (realistic: congested links drop more packets)
+        utilization = d.get('utilization', 0.0)
+        congestion_loss = utilization * 0.03  # Up to 3% additional loss at full utilization
+        
         # if currently in a burst window stored in state, reduce remaining time
         burst_state = ds.get('burst_state', None)
         if burst_state and 'ends_at' in burst_state:
             if t >= burst_state['ends_at']:
                 # end the burst
                 ds.pop('burst_state', None)
-                d['loss_prob'] = base_loss
+                d['loss_prob'] = min(1.0, base_loss + congestion_loss)
             else:
                 # still in burst
-                d['loss_prob'] = min(1.0, base_loss + burst_state.get('add', burst_add))
+                d['loss_prob'] = min(1.0, base_loss + burst_state.get('add', burst_add) + congestion_loss)
         else:
             # maybe start a new burst
             if random.random() < burst_prob:
                 ds['burst_state'] = {'add': burst_add, 'ends_at': t + burst_dur}
-                d['loss_prob'] = min(1.0, base_loss + burst_add)
+                d['loss_prob'] = min(1.0, base_loss + burst_add + congestion_loss)
             else:
-                # small fluctuation
-                d['loss_prob'] = max(0.0, base_loss + random.gauss(0, base_loss * 0.5))
+                # small fluctuation + congestion effect
+                d['loss_prob'] = max(0.0, min(1.0, base_loss + random.gauss(0, base_loss * 0.5) + congestion_loss))
 
         # update last_update
         ds['last_update_t'] = t
+        
+        # Initialize utilization tracking if not present
+        if 'utilization' not in d:
+            d['utilization'] = 0.0
+        if 'active_flows' not in d:
+            d['active_flows'] = 0
 
 
 # ----------------------

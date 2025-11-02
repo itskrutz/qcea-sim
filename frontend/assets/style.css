@@ -1,0 +1,164 @@
+/* --- Define Color Palette (Fintech/Crypto) --- */
+:root {
+  --primary-bg: #121212;      /* Very dark gray/black */
+  --card-bg: #1D1D1D;         /* Lighter card background */
+  --border-color: #333333;   /* Subtle border */
+  
+  --accent-lime: #BEF264;     /* Bright, modern lime green */
+  --accent-lime-dark: #A3E635;
+  
+  /* --- Chart Colors --- */
+  --pqcea-color: #E040FB;     /* Vibrant Magenta (NEW) */
+  --qcea-color: var(--accent-lime);
+  --dijkstra-color: #38BDF8;  /* Light Blue */
+
+  --light-text: #F1F5F9;     
+  --muted-text: #94A3B8;
+  --danger-red: #EF4444;
+}
+
+/* --- Import Google Font (Inter is perfect for this style) --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+/* --- Base Body Styling --- */
+body {
+  background-color: var(--primary-bg);
+  color: var(--light-text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* --- Navbar Styling --- */
+.navbar {
+  background-color: var(--primary-bg) !important;
+  border-bottom: 1px solid var(--border-color);
+  padding: 1rem 2rem;
+}
+.navbar-brand {
+  color: var(--light-text) !important;
+  font-weight: 700;
+  font-size: 1.5rem;
+}
+.navbar-brand-accent {
+  color: var(--pqcea-color); /* MODIFIED: Use new accent color */
+  margin-left: 0.25rem;
+}
+
+/* --- Card Styling --- */
+.card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--light-text);
+  margin-bottom: 1.5rem;
+}
+
+/* --- Collapsible Controls Card --- */
+#collapse-controls .card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  padding: 1.5rem;
+}
+
+/* --- KPI Card Styling (Like the small stat boxes) --- */
+.kpi-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: left;
+  transition: all 0.3s ease;
+}
+.kpi-card:hover {
+  border-color: var(--pqcea-color);
+  box-shadow: 0 0 20px rgba(224, 64, 251, 0.1);
+}
+.kpi-card .card-title {
+  color: var(--muted-text) !important;
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+.kpi-card .card-text {
+  font-size: 2.2rem;
+  font-weight: 700;
+}
+
+/* --- Button Styling --- */
+.btn {
+  font-weight: 600;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  padding: 0.5rem 1rem;
+}
+.btn-primary { 
+  background-color: transparent;
+  border-color: var(--border-color);
+  color: var(--light-text);
+}
+.btn-primary:hover {
+  background-color: var(--border-color);
+  border-color: var(--border-color);
+}
+.btn-success {
+  background-color: var(--accent-lime);
+  border-color: var(--accent-lime);
+  color: #1E293B; /* Dark text on light button */
+}
+.btn-success:hover {
+  background-color: var(--accent-lime-dark);
+  border-color: var(--accent-lime-dark);
+}
+.btn-danger {
+  background-color: var(--danger-red);
+  border-color: var(--danger-red);
+  color: var(--light-text);
+}
+.btn-danger:hover {
+  background-color: #DC2626;
+  border-color: #DC2626;
+}
+
+/* --- Slider Styling --- */
+.rc-slider-track { background-color: var(--accent-lime) !important; }
+.rc-slider-handle {
+  border-color: var(--accent-lime) !important;
+  background-color: var(--accent-lime) !important;
+  box-shadow: 0 0 10px var(--accent-lime);
+}
+/* NEW: Make prediction sliders have new color */
+.prediction-slider .rc-slider-track { background-color: var(--pqcea-color) !important; }
+.prediction-slider .rc-slider-handle {
+  border-color: var(--pqcea-color) !important;
+  background-color: var(--pqcea-color) !important;
+  box-shadow: 0 0 10px var(--pqcea-color);
+}
+.prediction-slider .rc-slider-dot-active { border-color: var(--pqcea-color) !important; }
+
+.rc-slider-dot-active { border-color: var(--accent-lime) !important; }
+.rc-slider-mark-text { color: var(--muted-text) !important; }
+
+/* --- Log Text Area --- */
+#sim-log {
+  background-color: #000 !important;
+  color: var(--muted-text) !important;
+  border: 1px solid var(--border-color);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* --- Radio Items --- */
+.form-check-input:checked {
+  background-color: var(--accent-lime);
+  border-color: var(--accent-lime);
+}
+
+/* --- FIX: KPI Grid Title --- */
+.kpi-grid-title {
+  color: var(--light-text) !important; /* Use the main bright text color */
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 1.1rem;
+  letter-spacing: 0.5px;
+  opacity: 0.9; /* Slightly softer than pure white */
+}
+
