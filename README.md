@@ -137,6 +137,7 @@ qcea-sim/
 │   └── topology_sample.yaml     # Sample network topology
 ├── demo_pqcea.py                # ⭐ Complete demonstration
 ├── test_pqcea.py                # ⭐ Test suite
+|---compare_topologies.py
 └── README.md                    # This file
 ```
 
