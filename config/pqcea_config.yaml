@@ -1,0 +1,71 @@
+# Configuration for P-QCEA Comparative Simulation
+
+# Topology settings
+topology_path: config/topology_sample.yaml
+
+# Simulation parameters
+simulation_mode: comparative  # 'comparative' or 'single'
+time_steps: 100
+time_step_duration_ms: 100
+num_flows: 5
+seed: 42
+
+# Algorithm selection (for comparative mode)
+run_dijkstra: true   # Baseline shortest path
+run_qcea: true       # QoS-aware without prediction  
+run_pqcea: true      # Predictive QCEA (your novel approach)
+run_adaptive: false  # Adaptive P-QCEA (advanced variant)
+
+# Prediction parameters
+prediction_horizon: 3  # Steps ahead to predict
+prediction:
+  history_size: 15
+  alpha: 0.3  # Exponential smoothing factor
+  confidence_threshold: 0.7
+
+# Routing weights (multi-objective cost function)
+weights:
+  wl: 0.3   # Latency weight
+  wb: 0.2   # Bandwidth weight  
+  wp: 0.2   # Packet loss weight
+  we: 0.2   # Residual energy weight
+  wc: 0.1   # Transmission cost weight
+
+# Traffic generation
+traffic:
+  classes:
+    - type: voip
+      fraction: 0.3
+      packet_size: 160
+    - type: video
+      fraction: 0.4
+      packet_size: 1400
+    - type: besteffort
+      fraction: 0.3
+      packet_size: 1500
+
+# Dynamic network parameters (for topology updates)
+dynamics:
+  bw_variation_frac: 0.2
+  delay_jitter_ms: 2.0
+  loss_burst_prob: 0.001
+  loss_burst_add: 0.05
+  burst_duration_s: 5.0
+
+# Visualization settings
+visualization:
+  enabled: true
+  save_plots: true
+  plot_directory: results/plots
+  metrics_to_plot:
+    - delay
+    - throughput
+    - energy
+    - packet_delivery
+
+# Output settings
+output:
+  save_results: true
+  results_directory: results
+  save_format: json  # 'json' or 'csv'
+  verbose: true
