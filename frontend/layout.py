@@ -42,7 +42,7 @@ def create_network_figure(G=None, active_paths=[]):
         if energy_frac > 0.7: node_color.append('#22C55E') # Green
         elif energy_frac > 0.3: node_color.append('#F59E0B') # Amber
         else: node_color.append('#EF4444') # Red
-        
+
         node_size.append(20 if data.get('role') == 'core' else 12)
 
     node_trace = go.Scatter(
@@ -366,9 +366,12 @@ def build_layout():
                     dbc.Button("Simulation Controls", id="btn-toggle-controls", color="primary", className="me-2"),
                     dbc.Button("► Start", id="btn-start", color="success", n_clicks=0),
                     dbc.Button("■ Stop", id="btn-stop", color="danger", n_clicks=0, className="ms-2"),
+                    dbc.Button("📊 Export Report", id="btn-export-report", color="info", className="ms-2", n_clicks=0),
+                    dcc.Download(id="download-report"),
+                    dcc.Store(id='store-report-status', data={'last_export': None}),
                 ], width=12),
             ]),
-            
+
             dbc.Collapse(build_control_panel(), id="collapse-controls", is_open=False),
             
             # --- 3x3 KPI Grid ---
