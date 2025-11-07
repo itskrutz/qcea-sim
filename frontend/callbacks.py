@@ -5,6 +5,9 @@ import networkx as nx
 import numpy as np
 import random
 import yaml
+import json
+from datetime import datetime
+from src.performance import generate_performance_report
 
 # --- Import from layout file ---
 from .layout import (
@@ -245,6 +248,67 @@ def run_simulation_step(G, t, pqcea_router, qcea_router, num_flows=5, traffic_mi
     aggr_qcea['residual_energy'] = sum(d['residual_energy_j'] for _, d in G_qcea_energy.nodes(data=True))
     aggr_dijkstra['residual_energy'] = sum(d['residual_energy_j'] for _, d in G_dijkstra_energy.nodes(data=True))
     # -------------------------------------------------------------------------
+
+    # --- ADDITIONAL METRICS TRACKING ---
+    # Path length (hop count)
+    aggr_pqcea['avg_path_length'] = np.mean([len(p) - 1 for p in paths['pqcea']]) if paths['pqcea'] else 0
+    aggr_qcea['avg_path_length'] = np.mean([len(p) - 1 for p in paths['qcea']]) if paths['qcea'] else 0
+    aggr_dijkstra['avg_path_length'] = np.mean([len(p) - 1 for p in paths['dijkstra']]) if paths['dijkstra'] else 0
+    
+    # Network-level metrics
+    all_edges = list(G.edges(data=True))
+    avg_link_utilization = np.mean([d.get('utilization', 0.0) for _, _, d in all_edges]) if all_edges else 0.0
+    max_link_utilization = np.max([d.get('utilization', 0.0) for _, _, d in all_edges]) if all_edges else 0.0
+    avg_link_delay = np.mean([d.get('prop_delay_ms', 0.0) for _, _, d in all_edges]) if all_edges else 0.0
+    avg_link_loss = np.mean([d.get('loss_prob', 0.0) for _, _, d in all_edges]) if all_edges else 0.0
+    avg_node_energy = np.mean([d.get('residual_energy_j', 0.0) for _, d in G.nodes(data=True)]) if G.nodes() else 0.0
+    min_node_energy = np.min([d.get('residual_energy_j', 0.0) for _, d in G.nodes(data=True)]) if G.nodes() else 0.0
+    
+    # Link congestion (utilization > 0.8)
+    congested_links = sum(1 for _, _, d in all_edges if d.get('utilization', 0.0) > 0.8)
+    congestion_ratio = congested_links / len(all_edges) if all_edges else 0.0
+    
+    # Add network state to all metrics
+    network_state = {
+        'avg_link_utilization': avg_link_utilization,
+        'max_link_utilization': max_link_utilization,
+        'avg_link_delay_ms': avg_link_delay,
+        'avg_link_loss_prob': avg_link_loss,
+        'avg_node_energy_j': avg_node_energy,
+        'min_node_energy_j': min_node_energy,
+        'congested_links_count': congested_links,
+        'congestion_ratio': congestion_ratio,
+        'total_edges': len(all_edges),
+        'total_nodes': len(G.nodes())
+    }
+    
+    aggr_pqcea.update(network_state)
+    aggr_qcea.update(network_state)
+    aggr_dijkstra.update(network_state)
+    
+    # Prediction-specific metrics (P-QCEA only)
+    pred_stats = pqcea_router.get_statistics()
+    aggr_pqcea['paths_computed'] = pred_stats.get('paths_computed', 0)
+    aggr_pqcea['predictions_used_count'] = pred_stats.get('predictions_used', 0)
+    aggr_pqcea['predictions_skipped_count'] = pred_stats.get('predictions_skipped', 0)
+    aggr_pqcea['fallback_to_current_count'] = pred_stats.get('fallback_to_current', 0)
+    
+    predictor_stats = pred_stats.get('predictor', {})
+    aggr_pqcea['links_tracked'] = predictor_stats.get('num_links_tracked', 0)
+    aggr_pqcea['avg_history_size'] = predictor_stats.get('avg_history_size', 0)
+    
+    # Cost metrics (total path cost)
+    try:
+        aggr_pqcea['avg_path_cost'] = np.mean([sum(G.edges[u, v].get('cost', 0) for u, v in zip(p[:-1], p[1:])) 
+                                               for p in paths['pqcea']]) if paths['pqcea'] else 0
+        aggr_qcea['avg_path_cost'] = np.mean([sum(G.edges[u, v].get('cost', 0) for u, v in zip(p[:-1], p[1:])) 
+                                              for p in paths['qcea']]) if paths['qcea'] else 0
+        aggr_dijkstra['avg_path_cost'] = np.mean([sum(G_dijkstra.edges[u, v].get('weight', 0) for u, v in zip(p[:-1], p[1:])) 
+                                                  for p in paths['dijkstra']]) if paths['dijkstra'] else 0
+    except:
+        aggr_pqcea['avg_path_cost'] = 0
+        aggr_qcea['avg_path_cost'] = 0
+        aggr_dijkstra['avg_path_cost'] = 0
 
     # Get prediction stats for this step
     # Calculate path-level usage rate (not link-level)
@@ -672,3 +736,97 @@ def register_callbacks(app):
             kpi_d_jitter, kpi_q_jitter, kpi_p_jitter,
             chart_pred_usage, chart_pred_conf
         )
+    @app.callback(
+        [Output('download-report', 'data'),
+         Output('store-report-status', 'data'),
+         Output('sim-status', 'children', allow_duplicate=True)],
+        Input('btn-export-report', 'n_clicks'),
+        [State('store-sim-data-dijkstra', 'data'),
+         State('store-sim-data-qcea', 'data'),
+         State('store-sim-data-pqcea', 'data'),
+         State('store-sim-state', 'data')],
+        prevent_initial_call=True
+    )
+    def export_performance_report(n_clicks, dijkstra_data, qcea_data, pqcea_data, sim_state):
+        """Export simulation results and generate performance report."""
+        if not n_clicks:
+            return None, dash.no_update, dash.no_update
+        
+        dijkstra_metrics = dijkstra_data.get('metrics', [])
+        qcea_metrics = qcea_data.get('metrics', [])
+        pqcea_metrics = pqcea_data.get('metrics', [])
+        
+        if not any([dijkstra_metrics, qcea_metrics, pqcea_metrics]):
+            status_msg = "Status: No data to export. Run simulation first."
+            return None, dash.no_update, status_msg
+        
+        try:
+            # Create results directory
+            os.makedirs('results', exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # Generate comprehensive report
+            result = generate_performance_report(
+                dijkstra_metrics,
+                qcea_metrics,
+                pqcea_metrics,
+                config={
+                    'simulation_steps': sim_state.get('step', 0),
+                    'max_steps': sim_state.get('max_steps', 0)
+                },
+                output_dir='results'
+            )
+            
+            # Save raw data JSON for backup
+            raw_data_path = f'results/simulation_data_{timestamp}.json'
+            export_data = {
+                'metadata': {
+                    'timestamp': timestamp,
+                    'simulation_steps': sim_state.get('step', 0),
+                    'max_steps': sim_state.get('max_steps', 0)
+                },
+                'dijkstra_metrics': dijkstra_metrics,
+                'qcea_metrics': qcea_metrics,
+                'pqcea_metrics': pqcea_metrics,
+                'pqcea_predictor_history': pqcea_data.get('predictor_history', {})
+            }
+            
+            with open(raw_data_path, 'w') as f:
+                json.dump(export_data, f, indent=2)
+            
+            # Create zip file with comprehensive_comparison.png + all reports
+            zip_path = os.path.join('results', f'performance_report_{timestamp}.zip')
+            import zipfile
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                # Add text report
+                if os.path.exists(result['txt_path']):
+                    zipf.write(result['txt_path'], 'report.txt')
+                
+                # Add JSON report
+                if os.path.exists(result['json_path']):
+                    zipf.write(result['json_path'], 'data.json')
+                
+                # Add CSV files
+                for csv_file in result['csv_files']:
+                    if os.path.exists(csv_file):
+                        zipf.write(csv_file, os.path.basename(csv_file))
+                
+                # Add comprehensive comparison graph (the main graph)
+                if result.get('comprehensive_comparison_png') and os.path.exists(result['comprehensive_comparison_png']):
+                    zipf.write(result['comprehensive_comparison_png'], 'comprehensive_comparison.png')
+            
+            # Status message
+            if result.get('comprehensive_comparison_png'):
+                status_msg = f"Status: Complete report exported! ({timestamp})"
+            else:
+                status_msg = f"Status: Report exported (no graphs) - {result.get('report', {}).get('graphs', {}).get('error', 'N/A')}"
+            
+            # Return zip file for download
+            return dcc.send_file(zip_path), {'last_export': timestamp}, status_msg
+            
+        except Exception as e:
+            error_msg = f"Status: Export failed - {str(e)}"
+            print(f"Export error: {e}")
+            import traceback
+            traceback.print_exc()
+            return None, dash.no_update, error_msg
